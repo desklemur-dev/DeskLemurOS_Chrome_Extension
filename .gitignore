@@ -22,7 +22,8 @@ node_modules/
 *.p12
 *.pfx
 
-# Python helper cache and local publishing settings
+# Maintainer automation is kept outside this extension repository
 __pycache__/
 *.py[cod]
 publish.local.json
+*.py

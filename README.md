@@ -14,7 +14,6 @@ and app-side setup and packaging scripts are not included.
 - A compatible DeskLemurOS desktop app and its registered native messaging host.
 - The current app-side transport targets macOS and uses a Unix socket.
 - Node.js is needed to run the extension's local test.
-- Python 3.9 or later, Git, and GitHub CLI (`gh`) are needed for the publishing helper.
 
 ## Install an unpacked copy
 
@@ -72,45 +71,6 @@ concurrent tab ownership updates, reading and closing owned tabs, rejection of
 non-HTTP(S) URLs, and rejection of unknown tabs and commands. Success prints
 `service_worker.js: ok`.
 
-## Publish changes to GitHub
-
-This repository is maintained at `desklemur-dev/DeskLemurOS_Chrome_Extension`.
-The publishing helper is configured for this private repository and its `main`
-branch. Use its HTTPS `origin` URL; Git network operations use the same GitHub
-CLI account checked by the helper. It does not publish to the Chrome Web Store.
-
-From this extension directory, check the files and preview the changes:
-
-```bash
-python3 publish.py
-```
-
-To validate, commit changes, and push them:
-
-```bash
-python3 publish.py --push -m "Describe the extension changes"
-```
-
-Use the same command again if a previous push failed; an existing local commit
-can be pushed without creating another commit. The helper checks the extension
-files, runs the service-worker test, checks the repository and authenticated
-account, and checks the remote branch before publishing. It stops on unexpected
-files, pre-staged changes, or a remote branch that needs reconciliation. It
-never force-pushes or changes your global Git or GitHub login settings.
-
-The active GitHub CLI account must be `desklemur-dev`. If needed, switch to
-that already-authenticated account before publishing:
-
-```bash
-gh auth switch --hostname github.com --user desklemur-dev
-```
-
-You can check the publishing helper itself with:
-
-```bash
-python3 -m unittest -v test_publish
-```
-
 ## Develop with the desktop app source
 
 The following commands must run from a **full DeskLemurOS app source checkout**
@@ -164,8 +124,6 @@ Uploading this source to GitHub does not publish it to the Chrome Web Store.
 | `popup.html`, `popup.js` | Connection status and reconnect controls. |
 | `icons/` | Extension icons. |
 | `test_service_worker.cjs` | Local service-worker regression test. |
-| `publish.py` | Validate changes and publish them to the configured private GitHub repository. |
-| `test_publish.py` | Regression tests for the publishing helper. |
 | `STORE_LISTING.md` | Draft Chrome Web Store submission notes. |
 
 ## Contribution notes
