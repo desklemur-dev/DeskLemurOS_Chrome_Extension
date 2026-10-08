@@ -21,3 +21,8 @@ node_modules/
 *.pem
 *.p12
 *.pfx
+
+# Python helper cache and local publishing settings
+__pycache__/
+*.py[cod]
+publish.local.json
