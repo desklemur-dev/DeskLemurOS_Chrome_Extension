@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>DeskLemurOS Browser Bridge</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --ground: #ffffff;
+      --text: #1c1b1a;
+      --muted: #6b6661;
+      --line: #e4dfd8;
+      --accent: #c8642c;
+      --ok: #2f8f4e;
+      --warn: #b7791f;
+      --off: #9a948d;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --ground: #1f1e1c;
+        --text: #f1ede7;
+        --muted: #a8a199;
+        --line: #3a3733;
+        --accent: #e07b3f;
+        --ok: #4fbf72;
+        --warn: #e0a84a;
+        --off: #7d776f;
+      }
+    }
+    body {
+      margin: 0;
+      width: 320px;
+      padding: 14px 16px 12px;
+      background: var(--ground);
+      color: var(--text);
+      font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    header img { width: 32px; height: 32px; }
+    header h1 { margin: 0; font-size: 14px; font-weight: 650; }
+    #status { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+    #dot { width: 10px; height: 10px; border-radius: 50%; background: var(--off); flex: none; }
+    body[data-state="connected"] #dot { background: var(--ok); }
+    body[data-state="connecting"] #dot { background: var(--warn); }
+    body[data-state="rejected"] #dot { background: var(--warn); }
+    #guidance { margin: 8px 0 0; color: var(--muted); }
+    #detail { margin: 6px 0 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+    button {
+      margin-top: 12px;
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--accent);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+    footer {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+    }
+    #version { float: right; }
+  </style>
+</head>
+<body data-state="connecting">
+  <header>
+    <img src="icons/icon48.png" alt="">
+    <h1>DeskLemurOS Browser Bridge</h1>
+  </header>
+  <div id="status"><span id="dot"></span><span id="headline">Checking…</span></div>
+  <p id="guidance"></p>
+  <p id="detail" hidden></p>
+  <button id="connect" type="button" hidden>Connect now</button>
+  <footer>
+    <span id="version"></span>
+    Opens only the pages DeskLemurOS asks for, in background tabs, and reads only those tabs.
+  </footer>
+  <script src="popup.js"></script>
+</body>
+</html>

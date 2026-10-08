@@ -1,0 +1,23 @@
+# Local OS and editor files
+.DS_Store
+._*
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Local dependencies, logs, and generated packages
+node_modules/
+*.log
+/target/
+/dist/
+*.zip
+*.crx
+
+# Local configuration and private signing material
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
