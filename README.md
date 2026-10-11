@@ -143,3 +143,8 @@ Uploading this source to GitHub does not publish it to the Chrome Web Store.
 
 Windows support requires an app-side named-pipe transport and registry setup.
 Other browsers need their own native-host registration locations.
+
+## License
+
+This browser extension is licensed under the [MIT License](LICENSE).
+The separately distributed DeskLemurOS desktop app has its own license.
