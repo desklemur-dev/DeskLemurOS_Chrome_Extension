@@ -32,8 +32,19 @@ const MAX_TEXT_CHARS = 4_000_000;
 // the text cap because markup is mostly not text; still far below the browser's
 // limit for a message to the native host.
 const MAX_HTML_CHARS = 8_000_000;
+// How long `reload` waits before reloading, so its reply reaches the app first.
+const RELOAD_DELAY_MS = 200;
 
 let port = null;
+// Requests being handled right now, a reload's own included.
+let inFlight = 0;
+// Set once a reload is accepted. Nothing new is started after that: the reload
+// ends this worker, and a tab opened in the meantime would be forgotten by it
+// and left open in the user's browser.
+let reloadScheduled = false;
+// Tabs opened so far, so a reload that waited on storage can tell whether one
+// was opened while it waited.
+let tabsOpened = 0;
 // What the popup shows. "connected" is set only when the app has answered:
 // connectNative returns a port even when nothing is behind it, so an open port
 // alone proves nothing.
@@ -218,6 +229,7 @@ async function openUrl(params) {
   const timeoutMs = Number.isFinite(requested) ? Math.min(Math.max(requested, 1000), 120000) : 30000;
   // Background by default: opening a page for the app must not pull the
   // browser in front of whatever the user is doing.
+  tabsOpened += 1;
   const tab = await chrome.tabs.create({ url: parsed.href, active: params?.active === true });
   await rememberTab(tab.id);
   const loaded = await waitForLoad(tab.id, timeoutMs);
@@ -275,11 +287,51 @@ async function closeTab(params) {
   return { tab_id: tabId, closed: true };
 }
 
+// How an update of this folder reaches the browser. A service worker keeps
+// running the code it started with, even across a browser restart, until the
+// extension is reloaded. Refused while the app still has tabs open through the
+// bridge, or other requests under way: a reload forgets the tabs it opened, and
+// they would stay open in the user's browser.
+function busyWithRequests() {
+  const others = inFlight - 1;
+  return others > 0
+    ? new BridgeError("busy", `the bridge is handling ${others} other request(s); try again when they have finished`)
+    : null;
+}
+
+async function reloadExtension() {
+  const early = busyWithRequests();
+  if (early) throw early;
+  const openedBefore = tabsOpened;
+  const open = [];
+  for (const tabId of await ownedTabs()) {
+    // A tab that no longer exists is not a reason to refuse.
+    if (await chrome.tabs.get(tabId).then(() => true, () => false)) open.push(tabId);
+    else await forgetTab(tabId);
+  }
+  if (open.length > 0) {
+    throw new BridgeError("busy", `the bridge still has ${open.length} tab(s) open; try again when they are closed`);
+  }
+  // The checks above waited on storage, and another request may have started
+  // or opened a tab meanwhile. Checked again with no await before the flag is
+  // set, so nothing can slip in between.
+  const late = busyWithRequests();
+  if (late) throw late;
+  if (tabsOpened !== openedBefore) {
+    throw new BridgeError("busy", "the bridge opened a tab while the reload was being checked; try again");
+  }
+  reloadScheduled = true;
+  // After the reply below has gone out: reloading ends this worker at once.
+  setTimeout(() => chrome.runtime.reload(), RELOAD_DELAY_MS);
+  return { reloading: true, version: chrome.runtime.getManifest().version };
+}
+
 const METHODS = {
   open_url: openUrl,
   read_page_text: readPageText,
   read_page_html: readPageHtml,
   close_tab: closeTab,
+  reload: reloadExtension,
 };
 
 function handleAppEvent(source, message) {
@@ -308,11 +360,21 @@ async function handleMessage(source, message) {
       console.warn("[bridge] could not reply:", error?.message || error);
     }
   };
+  if (reloadScheduled) {
+    reply({
+      ok: false,
+      error: { code: "reloading", message: "the extension is reloading; send this again once it has reconnected" },
+    });
+    return;
+  }
   const method = Object.hasOwn(METHODS, message.method) ? METHODS[message.method] : null;
   if (!method) {
     reply({ ok: false, error: { code: "unknown_method", message: `unknown method: ${String(message.method)}` } });
     return;
   }
+  // Counted from here, before the method's first await, so a reload arriving
+  // next sees this request under way.
+  inFlight += 1;
   try {
     reply({ ok: true, result: await method(message.params || {}) });
   } catch (error) {
@@ -323,6 +385,8 @@ async function handleMessage(source, message) {
         message: String(error?.message || error),
       },
     });
+  } finally {
+    inFlight -= 1;
   }
 }
 

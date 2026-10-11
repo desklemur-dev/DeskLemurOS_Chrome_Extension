@@ -39,6 +39,7 @@ registration must allow the ID of the extension installed in Chrome.
 | `read_page_text` | Returns the visible text of a tab the bridge opened. |
 | `read_page_html` | Returns the markup of a tab the bridge opened, including search-result pages. |
 | `close_tab` | Closes a tab the bridge opened. |
+| `reload` | Reloads the extension so Chrome runs the files now in its folder, for example after an update. Refused while the bridge has tabs open. |
 
 The command set is fixed. The extension does not execute code supplied by the
 app, open non-HTTP(S) URLs, or read or close tabs outside its owned-tab list.
@@ -68,8 +69,9 @@ node test_service_worker.cjs
 The test uses Node.js built-in modules and a simulated Chrome API. No package
 installation, running browser, desktop app, or native host is needed. It checks
 concurrent tab ownership updates, reading and closing owned tabs, rejection of
-non-HTTP(S) URLs, and rejection of unknown tabs and commands. Success prints
-`service_worker.js: ok`.
+non-HTTP(S) URLs, rejection of unknown tabs and commands, and that `reload`
+answers before it reloads and is refused while bridge tabs are open. Success
+prints `service_worker.js: ok`.
 
 ## Develop with the desktop app source
 
