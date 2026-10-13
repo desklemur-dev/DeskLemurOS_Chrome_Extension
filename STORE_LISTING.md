@@ -32,16 +32,18 @@ by the store.
 > app on the same computer.
 >
 > When you enable it in DeskLemurOS, the app can open a web page in a background
-> tab of this browser, read the page's content, and close the tab again. That
-> lets DeskLemurOS read pages and search results the way you see them, instead
-> of through a separate automated browser.
+> tab of this browser, read the page's content, and close the tab again. With
+> interactive operations in the app's websurfing tool, agents can also keep a task-owned tab open,
+> click controls, fill forms, select options, scroll, and navigate. They receive
+> a fresh page snapshot after each action. Other tabs are outside its control.
 >
 > What it does not do: it cannot read tabs you opened yourself, it opens only
 > http and https pages, and it runs a fixed set of commands — the app cannot
 > send it code to execute.
 >
-> The extension contacts no server. It talks only to the DeskLemurOS app on
-> your computer, through Chrome's Native Messaging.
+> The extension exchanges commands and page observations with DeskLemurOS on
+> your computer through Chrome's Native Messaging. Normal page loads and form
+> actions communicate with the websites you choose.
 >
 > Requires the DeskLemurOS desktop app. Without it, the extension does nothing.
 
@@ -58,15 +60,15 @@ by the store.
 **Single purpose**
 
 > Lets the DeskLemurOS desktop app on the same computer open web pages in this
-> browser and read their content.
+> browser, read their content, and interact with controls in the tabs it opens.
 
 **Permission justifications**
 
 | Permission | Justification |
 | --- | --- |
 | `nativeMessaging` | The extension's only communication channel. It exchanges messages with the DeskLemurOS desktop app installed on the same computer. No network connection is made. |
-| `scripting` | Reads the visible text (`document.body.innerText`) or the markup (`document.documentElement.outerHTML`), plus the title and URL, of a tab that the extension itself opened at the app's request. The markup is used to pick search results out of a results page. The injected functions are part of the extension package; no code is received at runtime. |
-| `storage` | Uses `chrome.storage.session` to remember which tab IDs the extension opened, so it never reads or closes a tab the user opened. Nothing is stored persistently. |
+| `scripting` | Reads text, markup and bounded interactive-element snapshots in tabs the extension opened. Executes packaged click, fill, select, scroll and keyboard handlers against elements in the latest snapshot. No code or selectors are received from the app at runtime. |
+| `storage` | Uses `chrome.storage.session` for owned tab IDs and task session mappings, so it never controls a tab the user opened. Nothing is stored persistently. |
 | `alarms` | Retries the connection to the desktop app every 30 seconds while it is not running. A Manifest V3 service worker cannot keep a timer alive on its own. |
 | Host permissions `http://*/*`, `https://*/*` | The user's app decides which page to open, so the address is not known in advance. Access is used only on tabs the extension opened; it does not read or modify any other tab. |
 
@@ -78,22 +80,25 @@ permissions an extension does not need.
 
 **Data usage**
 
-- Collected: **Website content** — the visible text or markup, title, and URL
-  of pages the extension opens at the app's request.
-- Not collected: personally identifiable information, health, financial,
-  authentication, personal communications, location, web history, user activity.
-- Certify all three limited-use statements. They are true as long as the page
-  text goes only to the user's own DeskLemurOS installation.
+- Website content sent to the app: requested text or markup, title, URL, and
+  interactive-element labels and states. Snapshots omit password input values.
+- Form input travels from the app to the selected page. Clicks and submissions
+  can change data or send information to that site's servers as the signed-in user.
+- Page content may itself contain personal or sensitive information. Disclose
+  actual data handling accurately; do not claim that such content is never read.
+- Complete the store's data disclosures against the final app configuration and
+  privacy policy before submission.
 
 **Privacy policy URL** — required, and has to be hosted by the publisher. It
 must say, accurately:
 
 1. What is read: the text or markup, title, and URL of pages DeskLemurOS asks
-   the extension to open, including search-result pages. Pages load with the
+   the extension to open, including search-result pages and element snapshots. Pages load with the
    user's signed-in sessions, so a search made this way is made as the user and
    may appear in their search history with that provider.
 2. Where it goes: only to the DeskLemurOS app on the same computer. The
-   extension sends nothing to the publisher or to any server.
+   extension has no publisher telemetry endpoint. Normal page loads and actions
+   still communicate with the websites the user chooses.
 3. What DeskLemurOS then does with it: the text is given to the AI model the
    user configured. **If that model is a cloud service, the page text is sent to
    that provider.** Do not write "nothing leaves your computer" — it is true of
@@ -116,6 +121,9 @@ way to get it, or the review has nothing to verify.
 >    with DeskLemurOS closed, "DeskLemurOS is not reachable".)
 > 4. Ask DeskLemurOS to read a JavaScript-heavy page. A background tab opens,
 >    is read, and closes.
+> 5. Keep `websurfing` selected in Tool Control. On a test page, ask the agent to fill a
+>    search field, click Search, inspect the result, and close the tab. Confirm
+>    that only the app-created tab is controlled.
 
 ## After the first upload
 

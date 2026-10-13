@@ -65,7 +65,29 @@
       color: var(--muted);
       font-size: 11px;
     }
-    #version { float: right; }
+    footer p { margin: 0; }
+    .footer-links {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .github-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 28px;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      border-radius: 3px;
+    }
+    .github-link:hover { text-decoration-thickness: 2px; }
+    .github-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    #version { white-space: nowrap; }
   </style>
 </head>
 <body data-state="connecting">
@@ -78,8 +100,11 @@
   <p id="detail" hidden></p>
   <button id="connect" type="button" hidden>Connect now</button>
   <footer>
-    <span id="version"></span>
-    Opens only the pages DeskLemurOS asks for, in background tabs, and reads only those tabs.
+    <p>Lets DeskLemurOS read and interact with pages in tabs it opens. Your other tabs stay outside its control.</p>
+    <div class="footer-links">
+      <a class="github-link" href="https://github.com/desklemur-dev/DeskLemurOS_Chrome_Extension" target="_blank" rel="noopener noreferrer" aria-label="View DeskLemurOS Browser Bridge on GitHub (opens in a new tab)">GitHub <span aria-hidden="true">↗</span></a>
+      <span id="version"></span>
+    </div>
   </footer>
   <script src="popup.js"></script>
 </body>

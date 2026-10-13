@@ -2,7 +2,7 @@
 //
 // [DeskLemurOS] <-> native host (stdio relay) <-> this service worker <-> tabs
 //
-// This file is the whole extension. It is plain, unminified, dependency-free
+// The worker and its packaged browser_interaction.js are plain, unminified, dependency-free
 // JavaScript on purpose: both extension stores refuse obfuscated code, and a
 // bridge that can read pages in someone's logged-in browser should be readable
 // by the person installing it.
@@ -18,6 +18,8 @@
 //   3. The extension dials out; nothing listens. chrome.runtime.connectNative
 //      starts the native host, and Chrome only lets extensions listed in that
 //      host's manifest do so. There is no port for anything else to find.
+
+importScripts("browser_interaction.js");
 
 const HOST_NAME = "com.desklemur.browser_bridge";
 // Bumped only for a change the other side cannot ignore. The app compares it to
@@ -51,6 +53,7 @@ let tabsOpened = 0;
 //   state: "disconnected" | "connecting" | "connected" | "rejected"
 //   detail: Chrome's own disconnect reason, or the app's rejection reason
 let link = { state: "disconnected", detail: "", app: null };
+let interactionCleanup = Promise.resolve();
 
 function setLink(state, detail = "", app = null) {
   link = { state, detail, app };
@@ -86,6 +89,11 @@ function connect() {
     if (port === candidate) {
       port = null;
       setLink("disconnected", reason);
+      // A session cannot migrate silently to another app connection. Finish
+      // any dispatched action, then close only this bridge's interactive tabs.
+      interactionCleanup = interactionCleanup.then(() => browserInteractions.closeAll()).catch(error => {
+        console.warn("[bridge] interactive session cleanup failed:", error?.message || error);
+      });
     }
     console.info("[bridge] disconnected:", reason);
   });
@@ -97,6 +105,7 @@ function connect() {
       protocol: PROTOCOL_VERSION,
       extension_version: chrome.runtime.getManifest().version,
       browser: "chrome",
+      capabilities: ["browser_interaction_v1"],
     },
   });
 }
@@ -173,7 +182,7 @@ async function ownedTabs() {
   return readOwnedTabs();
 }
 
-async function requireOwnedTab(params) {
+async function requireOwnedTab(params, sessionId = null) {
   const tabId = params?.tab_id;
   if (!Number.isInteger(tabId)) {
     throw new BridgeError("invalid_params", "tab_id must be an integer");
@@ -181,11 +190,13 @@ async function requireOwnedTab(params) {
   if (!(await ownedTabs()).has(tabId)) {
     throw new BridgeError("unknown_tab", "that tab was not opened by the bridge, or is already closed");
   }
+  await browserInteractions.requireTabAccess(tabId, sessionId);
   return tabId;
 }
 
 chrome.tabs.onRemoved.addListener(tabId => {
   void forgetTab(tabId);
+  void browserInteractions.forgetRemoved(tabId);
 });
 
 // ── Commands ─────────────────────────────────────────────────────────
@@ -326,12 +337,21 @@ async function reloadExtension() {
   return { reloading: true, version: chrome.runtime.getManifest().version };
 }
 
+const browserInteractions = createBrowserInteraction({
+  chrome, BridgeError, rememberTab, forgetTab, requireOwnedTab, waitForLoad,
+  tabOpening: () => { tabsOpened += 1; },
+});
+
 const METHODS = {
   open_url: openUrl,
   read_page_text: readPageText,
   read_page_html: readPageHtml,
   close_tab: closeTab,
   reload: reloadExtension,
+  browser_open: browserInteractions.browser_open,
+  browser_snapshot: browserInteractions.browser_snapshot,
+  browser_action: browserInteractions.browser_action,
+  browser_close: browserInteractions.browser_close,
 };
 
 function handleAppEvent(source, message) {
@@ -376,6 +396,10 @@ async function handleMessage(source, message) {
   // next sees this request under way.
   inFlight += 1;
   try {
+    if (String(message.method).startsWith("browser_")) {
+      await interactionCleanup;
+      if (source !== port) throw new BridgeError("disconnected", "the app connection changed before this browser operation began");
+    }
     reply({ ok: true, result: await method(message.params || {}) });
   } catch (error) {
     reply({
@@ -392,5 +416,10 @@ async function handleMessage(source, message) {
 
 // Also on every worker start: the events above do not fire when the worker is
 // merely woken, and a wake is exactly when a connection may be missing.
+// A terminated worker cannot run its disconnect callback. Python invalidates
+// those connections, so remove the old session tabs before accepting new work.
+interactionCleanup = browserInteractions.closeAll().catch(error => {
+  console.warn("[bridge] prior session cleanup failed:", error?.message || error);
+});
 scheduleReconnect();
 connect();

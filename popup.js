@@ -35,7 +35,7 @@ function describe(link) {
     return {
       state: "connected",
       headline: "Connected to DeskLemurOS",
-      guidance: "DeskLemurOS can open pages in background tabs of this browser and read them. It cannot read tabs you opened yourself.",
+      guidance: "DeskLemurOS can use websurfing to read pages, click, fill forms, and navigate in tabs it opens. It cannot control tabs you opened yourself.",
       detail: "",
     };
   }

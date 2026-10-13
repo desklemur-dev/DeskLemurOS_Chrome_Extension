@@ -2,7 +2,7 @@
 
 Chrome extension source for **DeskLemurOS Browser Bridge**. It connects Chrome
 to a DeskLemurOS desktop app on the same computer so the app can open web pages,
-read their content, and close the tabs it created.
+read their content, click controls, fill forms, navigate, and close the tabs it created.
 
 The extension is installed separately from the desktop app. This directory
 contains the browser extension only; the desktop app, native messaging host,
@@ -10,9 +10,11 @@ and app-side setup and packaging scripts are not included.
 
 ## Requirements
 
+See [CHANGELOG.md](CHANGELOG.md) for version history and compatibility notes.
+
 - Chrome 120 or later, as specified in `manifest.json`.
 - A compatible DeskLemurOS desktop app and its registered native messaging host.
-- The current app-side transport targets macOS and uses a Unix socket.
+- A matching app build with interactive `websurfing` support is required for clicks, forms, and navigation.
 - Node.js is needed to run the extension's local test.
 
 ## Install an unpacked copy
@@ -40,17 +42,43 @@ registration must allow the ID of the extension installed in Chrome.
 | `read_page_html` | Returns the markup of a tab the bridge opened, including search-result pages. |
 | `close_tab` | Closes a tab the bridge opened. |
 | `reload` | Reloads the extension so Chrome runs the files now in its folder, for example after an update. Refused with `busy` while the bridge has tabs open or other requests under way. Once accepted, every further request is refused with `reloading` until the reloaded extension reconnects. |
+| `browser_open` | Creates a persistent, task-owned tab and returns its first snapshot. |
+| `browser_snapshot` | Observes visible text and interactive elements with short reference IDs. |
+| `browser_action` | Clicks, fills, selects, presses Enter/Escape, scrolls, navigates, or goes back; returns the resulting snapshot. |
+| `browser_close` | Closes the interactive session's tab. |
+
+In DeskLemurOS, select `websurfing` in Tool Control and enable Browser Bridge.
+The same tool handles search, page reading, and explicit interactive operations;
+there is no separate browser tool. Search and page reading also work without
+this extension through the app's existing retrieval and browser fallback paths.
+Interactive operations require the connected extension and never switch an
+active session to a different browser.
+
+The agent opens a session, uses the latest snapshot's references, checks the
+state after each action, then closes the tab. Sessions are tied to one agent
+invocation and one browser connection. They are cleaned up when the invocation
+ends or the app disconnects. Reloading the extension ends existing sessions.
+
+The first version supports ordinary controls in the main document. Snapshots
+are bounded and prioritize viewport elements; scroll to expose more controls.
+Frames, shadow DOM, canvas interaction, native dialogs, multiple-selection fields, and trusted
+input events are not supported. DOM keyboard events are synthetic. A dispatched
+action does not prove that a website accepted or completed it. After a lost
+reply, inspect the current page instead of blindly repeating a submission.
+Action replies also report `observed_state_changed` and `before_snapshot_id`.
+An unchanged captured view does not rule out a remote side effect, and a null
+comparison means the before/after view was unavailable.
 
 The command set is fixed. The extension does not execute code supplied by the
 app, open non-HTTP(S) URLs, or read or close tabs outside its owned-tab list.
 
 ```text
-DeskLemurOS app <-> Unix socket <-> native messaging host <-> Chrome extension <-> tabs
+DeskLemurOS app <-> local transport <-> native messaging host <-> Chrome extension <-> tabs
 ```
 
 The connection to the desktop app uses Chrome Native Messaging. Chrome starts
-the registered native host, which relays messages to the app's local socket.
-The bridge does not open a TCP port.
+the registered native host. The app uses a Unix socket on macOS/Linux and an
+authenticated loopback-only transport on Windows.
 
 Pages opened by the bridge use the browser's normal signed-in sessions. The
 extension sends their requested content to the local DeskLemurOS app; the app
@@ -74,6 +102,16 @@ answers before it reloads, is refused while bridge tabs are open or another
 request is under way, and that nothing new starts once a reload is accepted,
 so no tab can be left open by a reload. Success
 prints `service_worker.js: ok`.
+
+For DOM behavior, install Playwright and its Chromium browser in a development environment and run
+`node test_browser_interaction.cjs`. It uses isolated test pages and checks
+element references, form controls, scrolling, stale observations, and unsupported
+targets. In a full app checkout, this additionally exercises the native host and
+a disposable Chrome for Testing profile:
+
+```bash
+DESKLEMUR_BROWSER_E2E=1 python -m pytest core/test_browser_interaction_e2e.py
+```
 
 ## Develop with the desktop app source
 
@@ -125,16 +163,18 @@ Uploading this source to GitHub does not publish it to the Chrome Web Store.
 | --- | --- |
 | `manifest.json` | Manifest V3 metadata, permissions, and extension entry points. |
 | `service_worker.js` | Native messaging connection and fixed browser commands. |
+| `browser_interaction.js` | Packaged DOM actions, snapshots, references and session ownership. |
 | `popup.html`, `popup.js` | Connection status and reconnect controls. |
 | `icons/` | Extension icons. |
 | `test_service_worker.cjs` | Local service-worker regression test. |
+| `test_browser_interaction.cjs` | Browser DOM interaction regression test. |
 | `STORE_LISTING.md` | Draft Chrome Web Store submission notes. |
 
 ## Contribution notes
 
 - Request only permissions used by the extension, and update the corresponding
   explanations in `STORE_LISTING.md` when capabilities change.
-- Keep source readable. Do not add obfuscated code or runtime-loaded scripts,
+- Keep source readable. Do not add obfuscated code or remotely loaded scripts,
   `eval`, or `new Function`. Add capabilities as named commands.
 - Route owned-tab changes through `changeOwnedTabs` to preserve concurrent
   storage updates, and run `node test_service_worker.cjs` after changes.
@@ -145,8 +185,7 @@ Uploading this source to GitHub does not publish it to the Chrome Web Store.
   not substitute a private signing key.
 - Check third-party code licenses before introducing dependencies.
 
-Windows support requires an app-side named-pipe transport and registry setup.
-Other browsers need their own native-host registration locations.
+Each supported browser needs its own app-side native-host registration.
 
 ## License
 
